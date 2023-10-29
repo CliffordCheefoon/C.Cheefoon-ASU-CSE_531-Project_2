@@ -1,4 +1,5 @@
-# C.Cheefoon-ASU-CSE_531-Project_1
+# C.Cheefoon-ASU-CSE_531-Project_2
+## TO-DO: THIS IS THE README FOR PROJECT 1, THIS NEEDS TO GET REWRITTEN
 
 ## Problem Statement
 In the given scenario, N number of Customers and N number of bank Branches; Customer X submits requests (Deposit, Withdraw or Query) to Branch X. The major: it is required that all other Branches be aware of the requests made to keep the balance of all the Branches consistent.
