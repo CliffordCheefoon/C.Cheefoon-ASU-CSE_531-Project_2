@@ -12,6 +12,8 @@ message branchEventRequest{
     int32 customer_id = 2;
     event_type_enum event_type = 3;
     double money = 4;
+    int32 logical_clock = 5;
+    int32 customer_request_id = 6;
 
 }
 
@@ -21,6 +23,7 @@ message branchEventResponse{
     double money = 3;
     double balance = 4;
     bool is_success = 5;
+    int32 logical_clock = 6;
 }
 
 service branchEventSender{

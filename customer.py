@@ -34,6 +34,7 @@ class Customer:
         self.recvMsg: list = []                                                 # pylint: disable=invalid-name
         # pointer for the stub
         self.stub = self.createStub(branch_metadata)
+        self.logical_clock = 1
 
     def soft_reset(self):
         """removes previous recv_msg without removing local branch stub, 
@@ -58,7 +59,9 @@ class Customer:
                     customer_id=self.id,
                     event_id=incoming_event.id,
                     event_type= incoming_event.interface.name,
-                    money= incoming_event.money))
+                    money= incoming_event.money, 
+                    logical_clock=self.logical_clock,
+                    customer_request_id=0))
 
             if response.event_type ==  branch_pb2.event_type_enum.QUERY:                        # pylint:disable=no-member
                 self.recvMsg.append(event_query_response("query", response.balance))

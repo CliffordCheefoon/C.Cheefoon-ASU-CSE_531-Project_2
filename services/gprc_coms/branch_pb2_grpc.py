@@ -21,7 +21,6 @@ class branchEventSenderStub(object):
                 response_deserializer=branch_pb2.branchEventResponse.FromString,  # pylint: disable=no-member
                 )
 
-
 class branchEventSenderServicer(object):
     """Missing associated documentation comment in .proto file."""
 

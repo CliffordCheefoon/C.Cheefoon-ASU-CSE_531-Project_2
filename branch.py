@@ -36,6 +36,8 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
         # a list of received messages used for debugging purpose
         self.recv_msg = list()
         # iterate the processID of the branches
+        self.logical_clock = 1
+        # iterate the processID of the branches
 
         #Setup server logger to file
         server_log_dir = server_log_dir + f"/server-branch-id-{self.id}.txt"
@@ -74,8 +76,9 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
 
     def MsgDelivery(self,request, context):
         "The message handler"
-        self.logger.debug(f"""Recieved Event: customer_id = {request.customer_id} ||event_id = {request.event_id} || event_type = {branch_pb2.event_type_enum.Name((request.event_type)) } || money = {request.money}""")  # pylint: disable=logging-fstring-interpolation,no-member
-
+        self.bump_clock_w_event("recieved", request.logical_clock)
+        self.logger.debug(f"""Recieved Event: customer_id = {request.customer_id} ||event_id = {request.event_id} || event_type = {branch_pb2.event_type_enum.Name((request.event_type)) } || money = {request.money} || logical_clock = {self.logical_clock} || customer_request_id = {request.customer_request_id}""")  # pylint: disable=logging-fstring-interpolation,no-member
+        
         if request.event_type == branch_pb2.event_type_enum.QUERY:                              # pylint:disable=no-member
             balance = self.Query()
             return branchEventResponse(
@@ -90,7 +93,8 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
                 request.customer_id,
                 request.event_id,
                 request.event_type,
-                request.money)
+                request.money,
+                request.customer_request_id)
 
             return branchEventResponse(
                 event_id=request.event_id,
@@ -103,7 +107,8 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
                 request.customer_id,
                 request.event_id,
                 request.event_type,
-                request.money)
+                request.money,
+                request.customer_request_id)
 
             return branchEventResponse(
                 event_id=request.event_id,
@@ -124,7 +129,8 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
             customer_id: int,
             event_id:int,
             event: branch_pb2.event_type_enum,                                                  # pylint:disable=invalid-name,no-member
-            money: float
+            money: float,
+            customer_request_id : int
             ) -> [float,bool]:
         """Decrease balance"""
         if self.withdraw_op_check(money):
@@ -133,7 +139,7 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
             if self.id == customer_id:
                 #If the customer_id and the branch_id are the same, then this is the customer's 
                 # local branch, we need to propogate the change to other branches
-                self.Propogate_Withdraw(customer_id,event_id,event,money)
+                self.Propogate_Withdraw(customer_id,event_id,event,money, customer_request_id)
             return self.balance, True
         else:
             return self.balance, False
@@ -143,7 +149,8 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
             customer_id: int,
             event_id:int,
             event: branch_pb2.event_type_enum,                                                  # pylint:disable=invalid-name,no-member
-            money: float
+            money: float,
+            customer_request_id : int
             ) -> [float,bool]:
         """increase balance"""
         self.balance =  self.balance + money
@@ -151,7 +158,7 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
         if self.id == customer_id:
                 #If the customer_id and the branch_id are the same, then this is the customer's 
                 # local branch, we need to propogate the change to other branches
-            self.Propogate_Deposit(customer_id,event_id,event,money)
+            self.Propogate_Deposit(customer_id,event_id,event,money, customer_request_id)
         return self.balance, True
 
 
@@ -160,16 +167,22 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
             customer_id: int,
             event_id:int,
             event: branch_pb2.event_type_enum,                                                  # pylint:disable=invalid-name,no-member
-            money: float) -> bool:
+            money: float,
+            customer_request_id : int
+            ) -> bool:
         """Propogate Withdraw operation to peer branch servers"""
         broadcast_futures: list = []
         for branch in self.stub_list:
+            self.bump_clock_w_event("Propogate_Withdraw")
             broadcast_futures.append(branch.branch_stub.MsgDelivery.future(
                 request = branchEventRequest(
                     customer_id=customer_id,
                     event_id=event_id,
                     event_type= event,
-                    money= money)))
+                    money= money,
+                    logical_clock=self.logical_clock,
+                    customer_request_id=customer_request_id
+                    )))
         for future in broadcast_futures:
             future.result()
 
@@ -178,16 +191,22 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
             customer_id: int,
             event_id:int,
             event: branch_pb2.event_type_enum,                                                  # pylint:disable=invalid-name,no-member
-            money: float) -> bool:
+            money: float,
+            customer_request_id : int
+            ) -> bool:
         """Propogate Deposit operation to peer branch servers"""
         broadcast_futures: list = []
-        for branch in self.stub_list: # pylint:disable=not-an-iterable
+        for branch in self.stub_list:
+            self.bump_clock_w_event("Propogate_Deposit")
             broadcast_futures.append(branch.branch_stub.MsgDelivery.future(
                 request = branchEventRequest(
                     customer_id=customer_id,
                     event_id=event_id,
                     event_type= event,
-                    money= money)))
+                    money= money,
+                    logical_clock=self.logical_clock,
+                    customer_request_id=customer_request_id
+                    )))
         for future in broadcast_futures:
             future.result()
 
@@ -197,3 +216,18 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
             return False
         else:
             return True
+
+    def ___bump_clock(self, incoming_clock : int = None):
+        """Bumps the internal to the next logical tick"""
+        if incoming_clock is None:
+            self.logical_clock = self.logical_clock + 1
+            return
+        self.logical_clock = max(self.logical_clock, incoming_clock) + 1
+        return
+
+    def bump_clock_w_event(self, event:str, incoming_clock : int = None,):
+        """Bumps the internal to the next logical tick tracking the event"""
+        self.___bump_clock(incoming_clock)
+        #TODO log the event
+        return
+    
