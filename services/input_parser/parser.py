@@ -11,10 +11,10 @@ class customer_input_interface_enum(Enum):                                      
 class event:                                                                        # pylint: disable=invalid-name
     """Data Structure representing an event of a customer"""
     def __init__(self,
-                id_incoming: int,
+                customer_request_id: int,
                 interface: customer_input_interface_enum,
                 money: decimal = None):
-        self.id : int = id_incoming
+        self.customer_request_id : int = customer_request_id
         self.interface : customer_input_interface_enum = interface
         self.money : decimal = money
 
@@ -54,7 +54,7 @@ def get_customers(input_obj, logger : logging.Logger) -> list[customer_input]:
         if obj["type"] == "customer":
             events : list[event] = []
 
-            for event_input in  obj["events"]:
+            for event_input in  obj["customer-requests"]:
 
                 event_interface: customer_input_interface_enum
                 if event_input["interface"] == "withdraw":
@@ -69,9 +69,9 @@ def get_customers(input_obj, logger : logging.Logger) -> list[customer_input]:
                         was encountered: {event_input["interface"]}""")
 
                 logger.debug(f"""found customer event-> customer_id:{obj["id"]}, 
-                             event_id:{event_input["id"]}, event_interface: {event_input["interface"]},
+                             event_id:{event_input["customer-request-id"]}, event_interface: {event_input["interface"]},
                              event_money: {event_input.get("money")} """)
-                events.append(event(event_input["id"],event_interface, event_input.get("money")))
+                events.append(event(event_input["customer-request-id"],event_interface, event_input.get("money")))
 
             input_customers.append(customer_input(obj["id"], events))
     return input_customers

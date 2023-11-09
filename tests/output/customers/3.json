@@ -1,0 +1,2 @@
+{"customer_request_id": 5, "logical_clock": 1, "interface": "DEPOSIT", "comment": "event_sent from customer 3"}
+{"customer_request_id": 6, "logical_clock": 2, "interface": "WITHDRAW", "comment": "event_sent from customer 3"}

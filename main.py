@@ -12,9 +12,9 @@ import jsonpickle
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 PORT_OFFSET : int = 50000
-TEST_INPUT_FILE : str = """tests/test_case_50.json"""
+TEST_INPUT_FILE : str = """tests/sample_input.json"""
 TEST_OUTPUT_FILE: str = """tests/output/output.json"""
-BRANCH_SERVER_LOG_DIR :str = """tests/server_out/"""
+BRANCH_SERVER_LOG_DIR :str = """tests/server_out_logs/"""
 ################################################################
 
 def main(input_file_dir : str):
@@ -24,6 +24,17 @@ def main(input_file_dir : str):
 
     #Clear previous run branch server logs
     files = glob.glob(f'{BRANCH_SERVER_LOG_DIR}*')
+    for f in files:
+        os.remove(f)
+
+    #Clear previous logical clock output files (Customers)
+    files = glob.glob('tests/output/customers/*')
+    for f in files:
+        os.remove(f)
+
+
+    #Clear previous logical clock output files (Branches)
+    files = glob.glob('tests/output/branches/*')
     for f in files:
         os.remove(f)
 

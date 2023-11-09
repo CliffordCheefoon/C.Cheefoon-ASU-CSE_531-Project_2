@@ -1,8 +1,11 @@
+import os
 import grpc
+import jsonpickle
 from branch import branch_client_stub
 from services.gprc_coms import branch_pb2_grpc
 from services.gprc_coms import branch_pb2
-from services.gprc_coms.branch_pb2 import branchEventRequest, branchEventResponse               # pylint: disable=no-name-in-module
+from services.gprc_coms.branch_pb2 import branchEventRequest, branchEventResponse                       # pylint: disable=no-name-in-module
+from services.universal_data_objects import objects
 from services.input_parser.parser import branch_input, event
 
 
@@ -30,6 +33,8 @@ class Customer:
     def __init__(self, id: int, branch_metadata : branch_input):                                # pylint: disable=redefined-builtin
         # unique ID of the Customer
         self.id = id
+        self.logical_clock_output_dir = f"""tests/output/customers/{id}.json"""
+        os.makedirs(os.path.dirname("tests/output/customers/"), exist_ok=True)
         # a list of received messages used for debugging purpose
         self.recvMsg: list = []                                                 # pylint: disable=invalid-name
         # pointer for the stub
@@ -57,11 +62,21 @@ class Customer:
             response: branchEventResponse = self.stub.branch_stub.MsgDelivery(
                 request = branchEventRequest(
                     customer_id=self.id,
-                    event_id=incoming_event.id,
+                    event_id=incoming_event.customer_request_id,
                     event_type= incoming_event.interface.name,
-                    money= incoming_event.money, 
+                    money= incoming_event.money,
                     logical_clock=self.logical_clock,
-                    customer_request_id=0))
+                    customer_request_id=incoming_event.customer_request_id))
+            
+            
+            self.write_logical_clock_output(
+                response.event_id,
+                self.logical_clock,
+                incoming_event.interface.name,
+                f"event_sent from customer {self.id}"
+                )
+            
+            self.___bump_clock()
 
             if response.event_type ==  branch_pb2.event_type_enum.QUERY:                        # pylint:disable=no-member
                 self.recvMsg.append(event_query_response("query", response.balance))
@@ -89,3 +104,26 @@ class Customer:
     def get_customer_log(self) -> customer_response:
         "create a custom response object for output"
         return customer_response(self.id, self.recvMsg)
+
+    def write_logical_clock_output(
+            self,
+            customer_request_id: int,
+            logical_clock: int,
+            interface: str,
+            comment:
+            str
+            ):
+        data: objects.logical_clock_output = objects.logical_clock_output(customer_request_id, logical_clock, interface, comment)
+        with open(self.logical_clock_output_dir, "a", encoding="UTF8") as outfile:
+            outfile.write(jsonpickle.encode(
+                data,
+                unpicklable=False) + "\n")
+            
+
+    def ___bump_clock(self, incoming_clock : int = None):
+        """Bumps the internal to the next logical tick"""
+        if incoming_clock is None:
+            self.logical_clock = self.logical_clock + 1
+            return
+        self.logical_clock = max(self.logical_clock, incoming_clock) + 1
+        return

@@ -5,7 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
-tests/server_out
+tests/server_out_logs
 
 # Distribution / packaging
 .Python
