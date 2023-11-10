@@ -1,10 +1,13 @@
 import logging
+import os
 
 import grpc
 from services.gprc_coms import branch_pb2_grpc
 from services.gprc_coms import branch_pb2
 from services.gprc_coms.branch_pb2 import branchEventRequest, branchEventResponse           # pylint: disable=no-name-in-module
 from services.input_parser.parser import branch_input
+from services.universal_data_objects import objects
+import jsonpickle
 
 
 
@@ -55,6 +58,9 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
         # the list of Client stubs to communicate with the branches
         self.stub_list:list[branch_client_stub] = self.register_peer_stubs(branches_inputs)
 
+        self.logical_clock_output_dir = f"""tests/output/branches/{branch_data.id}.json"""
+        os.makedirs(os.path.dirname("tests/output/branches/"), exist_ok=True)
+
 
     def register_peer_stubs(
             self,
@@ -76,9 +82,28 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
 
     def MsgDelivery(self,request, context):
         "The message handler"
-        self.bump_clock_w_event("recieved", request.logical_clock)
-        self.logger.debug(f"""Recieved Event: customer_id = {request.customer_id} ||event_id = {request.event_id} || event_type = {branch_pb2.event_type_enum.Name((request.event_type)) } || money = {request.money} || logical_clock = {self.logical_clock} || customer_request_id = {request.customer_request_id}""")  # pylint: disable=logging-fstring-interpolation,no-member
-        
+
+
+        if request.customer_id == self.id:
+            self.bump_clock_w_event(
+                request.customer_request_id,
+                branch_pb2.event_type_enum.Name((request.event_type)),                              # pylint:disable=no-member
+                f"event_recv from Customer {request.customer_id}", 
+                request.logical_clock
+                )
+        else:
+            self.bump_clock_w_event(
+                request.customer_request_id,
+                f"propogate_{branch_pb2.event_type_enum.Name((request.event_type))}",                              # pylint:disable=no-member
+                f"event_recv from Branch {request.customer_id}", 
+                request.logical_clock
+                )
+
+
+
+
+        self.logger.debug(f"""Recieved Event: customer_id = {request.customer_id} ||event_id = {request.event_id} || event_type = {branch_pb2.event_type_enum.Name((request.event_type)) } || money = {request.money} || logical_clock = {request.logical_clock} || customer_request_id = {request.customer_request_id}""")  # pylint: disable=logging-fstring-interpolation,no-member
+
         if request.event_type == branch_pb2.event_type_enum.QUERY:                              # pylint:disable=no-member
             balance = self.Query()
             return branchEventResponse(
@@ -173,7 +198,13 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
         """Propogate Withdraw operation to peer branch servers"""
         broadcast_futures: list = []
         for branch in self.stub_list:
-            self.bump_clock_w_event("Propogate_Withdraw")
+
+            self.bump_clock_w_event(
+                customer_request_id,
+                "Propogate_Withdraw",
+                f"event_sent to branch {branch.branch_metadata.id}"
+                )
+
             broadcast_futures.append(branch.branch_stub.MsgDelivery.future(
                 request = branchEventRequest(
                     customer_id=customer_id,
@@ -197,7 +228,13 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
         """Propogate Deposit operation to peer branch servers"""
         broadcast_futures: list = []
         for branch in self.stub_list:
-            self.bump_clock_w_event("Propogate_Deposit")
+
+            self.bump_clock_w_event(
+                customer_request_id,
+                "Propogate_Deposit",
+                f"event_sent to branch {branch.branch_metadata.id}"
+                )
+
             broadcast_futures.append(branch.branch_stub.MsgDelivery.future(
                 request = branchEventRequest(
                     customer_id=customer_id,
@@ -225,9 +262,34 @@ class Branch(branch_pb2_grpc.branchEventSenderServicer):
         self.logical_clock = max(self.logical_clock, incoming_clock) + 1
         return
 
-    def bump_clock_w_event(self, event:str, incoming_clock : int = None,):
+    def bump_clock_w_event(
+            self,
+            customer_request_id: int,
+            interface: str,
+            comment: str,
+            incoming_clock: int = None):
         """Bumps the internal to the next logical tick tracking the event"""
         self.___bump_clock(incoming_clock)
+        self.write_logical_clock_output(customer_request_id, self.logical_clock, interface, comment)
         #TODO log the event
         return
+
+    def write_logical_clock_output(
+            self,
+            customer_request_id: int,
+            logical_clock: int,
+            interface: str,
+            comment: str
+            ):
+        """writes the logical clock output to file"""
+
+        interface = str.lower(interface)
+        data: objects.logical_clock_output = objects.logical_clock_output(
+            customer_request_id,
+            logical_clock,
+            interface, comment)
+        with open(self.logical_clock_output_dir, "a", encoding="UTF8") as outfile:
+            outfile.write(jsonpickle.encode(
+                data,
+                unpicklable=False) + "\n")
     

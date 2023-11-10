@@ -1,0 +1,10 @@
+{"customer_request_id": 1, "logical_clock": 2, "interface": "deposit", "comment": "event_recv from Customer 1"}
+{"customer_request_id": 1, "logical_clock": 3, "interface": "propogate_deposit", "comment": "event_sent to branch 2"}
+{"customer_request_id": 1, "logical_clock": 4, "interface": "propogate_deposit", "comment": "event_sent to branch 3"}
+{"customer_request_id": 2, "logical_clock": 5, "interface": "withdraw", "comment": "event_recv from Customer 1"}
+{"customer_request_id": 2, "logical_clock": 6, "interface": "propogate_withdraw", "comment": "event_sent to branch 2"}
+{"customer_request_id": 2, "logical_clock": 7, "interface": "propogate_withdraw", "comment": "event_sent to branch 3"}
+{"customer_request_id": 3, "logical_clock": 10, "interface": "propogate_deposit", "comment": "event_recv from Branch 2"}
+{"customer_request_id": 4, "logical_clock": 13, "interface": "propogate_withdraw", "comment": "event_recv from Branch 2"}
+{"customer_request_id": 5, "logical_clock": 17, "interface": "propogate_deposit", "comment": "event_recv from Branch 3"}
+{"customer_request_id": 6, "logical_clock": 20, "interface": "propogate_withdraw", "comment": "event_recv from Branch 3"}

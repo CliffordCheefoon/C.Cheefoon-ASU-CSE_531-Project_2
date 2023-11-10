@@ -110,15 +110,18 @@ class Customer:
             customer_request_id: int,
             logical_clock: int,
             interface: str,
-            comment:
-            str
+            comment: str
             ):
-        data: objects.logical_clock_output = objects.logical_clock_output(customer_request_id, logical_clock, interface, comment)
+        """writes the logical clock output to file"""
+        interface = str.lower(interface)
+        data: objects.logical_clock_output = objects.logical_clock_output(
+            customer_request_id,
+            logical_clock,
+            interface, comment)
         with open(self.logical_clock_output_dir, "a", encoding="UTF8") as outfile:
             outfile.write(jsonpickle.encode(
                 data,
                 unpicklable=False) + "\n")
-            
 
     def ___bump_clock(self, incoming_clock : int = None):
         """Bumps the internal to the next logical tick"""
