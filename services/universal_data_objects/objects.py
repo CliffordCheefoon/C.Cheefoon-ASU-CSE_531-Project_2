@@ -7,3 +7,9 @@ class logical_clock_output: # pylint:disable=invalid-name
         self.interface = interface
         self.comment = comment
 
+class entity_logical_clock_output: # pylint:disable=invalid-name
+    """"Data object"""
+    def __init__(self, id: int, type: str, events: list[dict]):
+        self.id = id
+        self.type = type
+        self.events = events
